@@ -10,5 +10,10 @@ with open('plaintext.txt', 'r') as infile:
 
 with open('ciphertext.txt', 'w') as outfile:
     for line in text:
-        keyIndices = [alphabet.index(k.lower()) for k in line]
+        keyIndices = []
+        for k in line:
+            try:
+                keyIndices.append(alphabet.index(k.lower()))
+            except ValueError:
+                print('Not found in alphabet or in key:', k.lower())
         outfile.write(''.join(key[keyIndex] for keyIndex in keyIndices))

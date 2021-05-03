@@ -9,16 +9,19 @@
 
 using namespace std;
 
-#define MAX_GENS 100
-#define POP_SIZE 200
+#define MAX_GENS 200
+#define POP_SIZE 250
 #define ALPH_SIZE 10
 #define ASCII_a 97
 #define MAX_TEXT_LEN 100
-#define MUTATION_CHANCE 50 // Out of 100 individuals, MUTATION_CHANCE will mutate
-#define ALPHA 0.6 // Weight of unigrams
-#define BETA 0.3 // Weight of bigrams
-#define GAMMA 0.1 // Weight of trigrams
-#define CUSTOM_FREQ false // Whether frequencies should be calculated from sample text file, or from predefined numbers
+#define CROSSOVER_CHANCE 50 // Out of 100 parents, CROSSOVER_CHANCE will crossover (the rest will just be copied)
+#define MUTATION_CHANCE 50 // Out of 100 children, MUTATION_CHANCE will mutate (the rest will just be copied)
+#define ALPHA 0.5 // Weight of unigrams
+#define BETA 0.25 // Weight of bigrams
+#define GAMMA 0.25 // Weight of trigrams
+#define PROPORTIONAL_SELECTION true // Selection proportional to weights (if false, then just kill bottom 50% of population)
+#define CUSTOM_FREQ false // Whether frequencies should be calculated from sample text file, or from predefined numbers (false is MUCH faster)
+#define FULL_BIGRAMS false // Whether to use the larger full_bigrams.txt file or the smaller bigrams.txt (false is faster)
 
 const char ALPHABET[ALPH_SIZE+1] = "abcdefghij";
 
@@ -153,7 +156,7 @@ void calcFitness(Individual population[], long double* fitnessSum, const string&
                 fitness += GAMMA * abs(cipherNgrams.at(it->first) - ngrams.at(it->first));
         }
 
-        population[idx].fitness = (long double)pow(1 - (fitness / 4), 8);
+        population[idx].fitness = (long double)pow((long double)pow(1 - (fitness / 4), 8), 3);
         *fitnessSum += population[idx].fitness;
     }
 }
@@ -166,16 +169,41 @@ void calcFitness(Individual population[], long double* fitnessSum, const string&
 void selection(Individual population[POP_SIZE], long double* fitnessSum)
 {
     Individual newPopulation[POP_SIZE];
-    for (int i = 0; i < POP_SIZE; i++)
+    if (PROPORTIONAL_SELECTION)
     {
-        int randomVal = rand() % (int)(*fitnessSum * 10000);
-        int index = 0;
-        while (randomVal > 0 && index < POP_SIZE)
+        for (int i = 0; i < POP_SIZE; i++)
         {
-            randomVal -= (int)(population[index].fitness * 10000);
-            index++;
+            int randomVal = rand() % (int)(*fitnessSum * 10000);
+            int index = 0;
+            while (randomVal > 0 && index < POP_SIZE)
+            {
+                randomVal -= (int)(population[index].fitness * 10000);
+                index++;
+            }
+            if (index == 0)
+                index++;
+            newPopulation[i] = population[index - 1];
         }
-        newPopulation[i] = population[index - 1];
+    }
+    else
+    {
+        long double avgFitness = *fitnessSum / (long double)POP_SIZE;
+        int i = 0, j = 0;
+        while (i < POP_SIZE)
+        {
+            for (int j = 0; j < POP_SIZE; j++)
+            {
+                if (population[j].fitness > avgFitness)
+                {
+                    newPopulation[i] = population[j];
+                    i++;
+                    if (i >= POP_SIZE)
+                        break;
+                }
+                if (i >= POP_SIZE)
+                    break;
+            }
+        }
     }
     population = newPopulation;
 }
@@ -188,6 +216,8 @@ void crossover(Individual population[])
 {
     for (int i = 0; i < POP_SIZE; i += 2)
     {
+        if (rand() % 100 >= CROSSOVER_CHANCE)
+            continue;
         string child1(ALPH_SIZE, ' ');
         string child2(ALPH_SIZE, ' ');
         unsigned short gene1 = rand() % ALPH_SIZE;
@@ -322,14 +352,20 @@ int main()
     }
     else // Reading frequencies from predefined numbers
     {
-        string filenames[] = {"unigrams.txt", "bigrams.txt", "trigrams.txt"};
+        string filenames[] = { "unigrams.txt", "bigrams.txt", "trigrams.txt" };
+        if (FULL_BIGRAMS)
+            filenames[1] = "full_bigrams.txt";
         for (string filename : filenames)
         {
             ifstream frequencyFile(filename);
             string key;
             long double number, frequency;
-            while (frequencyFile >> key >> number >> frequency)
-                ngrams.emplace(key, frequency / 100.0);
+            if (FULL_BIGRAMS && filename == "full_bigrams.txt")
+                while (frequencyFile >> key >> frequency)
+                    ngrams.emplace(key, frequency / 100.0);
+            else
+                while (frequencyFile >> key >> number >> frequency)
+                    ngrams.emplace(key, frequency / 100.0);
             frequencyFile.close();
         }
     }
