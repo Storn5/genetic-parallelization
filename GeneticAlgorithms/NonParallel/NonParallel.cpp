@@ -9,17 +9,18 @@
 
 using namespace std;
 
-#define MAX_GENS 10
-#define POP_SIZE 100
-#define ALPH_SIZE 26 + 1
+#define MAX_GENS 100
+#define POP_SIZE 200
+#define ALPH_SIZE 10
 #define ASCII_a 97
 #define MAX_TEXT_LEN 100
-#define MUTATION_CHANCE 60 // Out of 100 individuals, MUTATION_CHANCE will mutate
-#define ALPHA 0.65 // Weight of unigrams
-#define BETA 0.35 // Weight of bigrams
-#define GAMMA 0.0 // Weight of trigrams
+#define MUTATION_CHANCE 50 // Out of 100 individuals, MUTATION_CHANCE will mutate
+#define ALPHA 0.6 // Weight of unigrams
+#define BETA 0.3 // Weight of bigrams
+#define GAMMA 0.1 // Weight of trigrams
+#define CUSTOM_FREQ false // Whether frequencies should be calculated from sample text file, or from predefined numbers
 
-const char ALPHABET[ALPH_SIZE+1] = "abcdefghijklmnopqrstuvwxyz ";
+const char ALPHABET[ALPH_SIZE+1] = "abcdefghij";
 
 /// <summary>
 /// An Individual contains a chromosome (25 genes) and fitness score.
@@ -55,7 +56,7 @@ string decipher(const string& ciphertext, const string& key)
     string::size_type i;
     for (i = 0; i < ciphertext.length(); i++)
     {
-        if (isalpha(ciphertext[i]))
+        if (isalpha(ciphertext[i]) && ciphertext[i] - ASCII_a < ALPH_SIZE)
             plaintext += key[ciphertext[i] - ASCII_a];
         else
             plaintext += ciphertext[i];
@@ -69,10 +70,32 @@ string decipher(const string& ciphertext, const string& key)
 /// <param name="substring">Substring to count</param>
 /// <param name="text">Text to search</param>
 /// <returns>Number of substring occurences in text</returns>
-long countSubstring(const string& substring, const string& text)
+long double countSubstring(const string& substring, const string& text)
 {
-    long num = 0;
+    long double num = 0;
     for (size_t i = 0; (i = text.find(substring, i)) != string::npos; num++, i++);
+    return num;
+}
+
+/// <summary>
+/// Count number of n-grams in text.
+/// </summary>
+/// <param name="text">Text to search</param>
+/// <param name="n">n for the n-gram</param>
+/// <returns>Number of n-grams in text</returns>
+long double numNgrams(const string& text, unsigned short n)
+{
+    n--;
+    long double num = 0;
+    for (long i = 0; i < text.length() - n; i++)
+    {
+        num++;
+        for (long j = i; j < i + n + 1; j++)
+        {
+            if (isspace(text[j]))
+                num--;
+        }
+    }
     return num;
 }
 
@@ -80,50 +103,19 @@ long countSubstring(const string& substring, const string& text)
 /// Count the number of all 1, 2 and 3-letter combinations in the text.
 /// </summary>
 /// <param name="text">Text to search</param>
+/// <param name="sampleNgrams">Map of char combinations and their frequencies (from sample text)</param>
 /// <returns>Map of char combinations and their frequencies</returns>
-const map<string, long double> countNgrams(const string& text)
+const map<string, long double> countNgrams(const string& text, map<string, long double> sampleNgrams, long double num_unigrams, long double num_bigrams, long double num_trigrams)
 {
-    long double num_unigrams = 0.0, num_bigrams = 0.0, num_trigrams = 0.0;
     map<string, long double> ngrams;
-    for (int i = 0; i < ALPH_SIZE; i++)
+    for (map<string, long double>::iterator it = sampleNgrams.begin(); it != sampleNgrams.end(); it++)
     {
-        string key = string() + ALPHABET[i];
-        long double count = countSubstring(key, text);
-        num_unigrams += count;
-        ngrams.emplace(key, count);
-        for (int j = 0; j < ALPH_SIZE; j++)
-        {
-            string key = string() + ALPHABET[i] + ALPHABET[j];
-            count = countSubstring(key, text);
-            num_bigrams += count;
-            ngrams.emplace(key, count);
-            /*
-            for (int k = 0; k < ALPH_SIZE; k++)
-            {
-                string key = string() + ALPHABET[i] + ALPHABET[j] + ALPHABET[k];
-                count = countSubstring(key, text) / (long double) (text.length() - 2);
-                num_trigrams += count;
-                ngrams.emplace(key, count);
-            }
-            */
-        }
-    }
-    for (int i = 0; i < ALPH_SIZE; i++)
-    {
-        string key = string() + ALPHABET[i];
-        ngrams.at(key) = ngrams.at(key) / num_unigrams;
-        for (int j = 0; j < ALPH_SIZE; j++)
-        {
-            string key = string() + ALPHABET[i] + ALPHABET[j];
-            ngrams.at(key) = ngrams.at(key) / num_bigrams;
-            /*
-            for (int k = 0; k < ALPH_SIZE; k++)
-            {
-                string key = string() + ALPHABET[i] + ALPHABET[j] + ALPHABET[k];
-                ngrams.at(key) = ngrams.at(key) / num_trigrams;
-            }
-            */
-        }
+        if (it->first.length() == 1)
+            ngrams.emplace(it->first, (long double)(countSubstring(it->first, text) / num_unigrams));
+        else if (it->first.length() == 2)
+            ngrams.emplace(it->first, (long double)(countSubstring(it->first, text) / num_bigrams));
+        else
+            ngrams.emplace(it->first, (long double)(countSubstring(it->first, text) / num_trigrams));
     }
     return ngrams;
 }
@@ -145,30 +137,22 @@ void initPopulation(Individual population[])
 /// <param name="fitnessSum">Sum of fitness values of population</param>
 /// <param name="ciphertext">Text to be deciphered</param>
 /// <param name="ngrams">Map of char combinations and their frequencies</param>
-void calcFitness(Individual population[], long double* fitnessSum, const string& ciphertext, const map<string, long double> ngrams)
+void calcFitness(Individual population[], long double* fitnessSum, const string& ciphertext, map<string, long double> ngrams, long double num_unigrams, long double num_bigrams, long double num_trigrams)
 {
     for (int idx = 0; idx < POP_SIZE; idx++)
     {
-        map<string, long double> cipherNgrams = countNgrams(decipher(ciphertext, population[idx].genes));
+        map<string, long double> cipherNgrams = countNgrams(decipher(ciphertext, population[idx].genes), ngrams, num_unigrams, num_bigrams, num_trigrams);
         long double fitness = 0.0;
-
-        for (int i = 0; i < ALPH_SIZE; i++)
+        for (map<string, long double>::iterator it = ngrams.begin(); it != ngrams.end(); it++)
         {
-            string key = string() + ALPHABET[i];
-            fitness += ALPHA * (abs(cipherNgrams.at(key) - ngrams.at(key)));
-            for (int j = 0; j < ALPH_SIZE; j++)
-            {
-                key = string() + ALPHABET[i] + ALPHABET[j];
-                fitness += BETA * (abs(cipherNgrams.at(key) - ngrams.at(key)));
-                /*
-                for (int k = 0; k < ALPH_SIZE; k++)
-                {
-                    key = string() + ALPHABET[i] + ALPHABET[j] + ALPHABET[k];
-                    fitness += GAMMA * (abs(cipherNgrams.at(key) - ngrams.at(key)));
-                }
-                */
-            }
+            if (it->first.length() == 1)
+                fitness += ALPHA * abs(cipherNgrams.at(it->first) - ngrams.at(it->first));
+            else if (it->first.length() == 2)
+                fitness += BETA * abs(cipherNgrams.at(it->first) - ngrams.at(it->first));
+            else
+                fitness += GAMMA * abs(cipherNgrams.at(it->first) - ngrams.at(it->first));
         }
+
         population[idx].fitness = (long double)pow(1 - (fitness / 4), 8);
         *fitnessSum += population[idx].fitness;
     }
@@ -184,14 +168,12 @@ void selection(Individual population[POP_SIZE], long double* fitnessSum)
     Individual newPopulation[POP_SIZE];
     for (int i = 0; i < POP_SIZE; i++)
     {
-        unsigned long long randomVal = rand() % (unsigned long long)(*fitnessSum * 1000);
+        int randomVal = rand() % (int)(*fitnessSum * 10000);
         int index = 0;
-        while (randomVal > 0)
+        while (randomVal > 0 && index < POP_SIZE)
         {
-            if (index >= POP_SIZE)
-                cout << "Error?" << endl; break;
-            randomVal -= (unsigned long long)(population[index].fitness * 1000);
-            index ++;
+            randomVal -= (int)(population[index].fitness * 10000);
+            index++;
         }
         newPopulation[i] = population[index - 1];
     }
@@ -296,24 +278,61 @@ int main()
     int gen = 0;
     Individual population[POP_SIZE];
     initPopulation(population);
+    map<string, long double> ngrams;
+    long double num_unigrams, num_bigrams, num_trigrams;
 
     // Reading input from files
     ifstream ciphertextFile("ciphertext.txt"); // Text to be deciphered
     stringstream ciphertextBuffer;
     ciphertextBuffer << ciphertextFile.rdbuf();
     string ciphertext = ciphertextBuffer.str();
+    ciphertext.erase(std::remove_if(ciphertext.begin(), ciphertext.end(), [](const unsigned& c) { return !isspace(c) && !isalpha(c); }), ciphertext.end());
     ciphertextFile.close();
+    num_unigrams = numNgrams(ciphertext, 1);
+    num_bigrams = numNgrams(ciphertext, 2);
+    num_trigrams = numNgrams(ciphertext, 3);
 
-    ifstream sampletextFile("sampletext.txt"); // Text to calculate letter frequencies
-    stringstream sampletextBuffer;
-    sampletextBuffer << sampletextFile.rdbuf();
-    string sampletext = sampletextBuffer.str();
-    transform(sampletext.begin(), sampletext.end(), sampletext.begin(), ::tolower);
-    sampletext.erase(std::remove_if(sampletext.begin(), sampletext.end(), [](const unsigned& c) { return !isspace(c) && !isalpha(c); }), sampletext.end());
-    sampletextFile.close();
+    if (CUSTOM_FREQ) // Calculating frequencies from sample text file
+    {
+        ifstream sampletextFile("sampletext.txt"); // Text to calculate letter frequencies
+        stringstream sampletextBuffer;
+        sampletextBuffer << sampletextFile.rdbuf();
+        string sampletext = sampletextBuffer.str();
+        transform(sampletext.begin(), sampletext.end(), sampletext.begin(), ::tolower);
+        sampletext.erase(std::remove_if(sampletext.begin(), sampletext.end(), [](const unsigned& c) { return !isspace(c) && !isalpha(c); }), sampletext.end());
+        sampletextFile.close();
 
-    // Calculating n-gram frequencies
-    const map<string, long double> ngrams = countNgrams(sampletext);
+        // Calculating n-gram frequencies
+        for (int i = 0; i < ALPH_SIZE; i++)
+        {
+            string key = string() + ALPHABET[i];
+            ngrams.at(key) = 0.0;
+            for (int j = 0; j < ALPH_SIZE; j++)
+            {
+                key = string() + ALPHABET[i] + ALPHABET[j];
+                ngrams.at(key) = 0.0;
+                for (int k = 0; k < ALPH_SIZE; k++)
+                {
+                    key = string() + ALPHABET[i] + ALPHABET[j] + ALPHABET[k];
+                    ngrams.at(key) = 0.0;
+                }
+            }
+        }
+        ngrams = countNgrams(sampletext, ngrams, num_unigrams, num_bigrams, num_trigrams);
+    }
+    else // Reading frequencies from predefined numbers
+    {
+        string filenames[] = {"unigrams.txt", "bigrams.txt", "trigrams.txt"};
+        for (string filename : filenames)
+        {
+            ifstream frequencyFile(filename);
+            string key;
+            long double number, frequency;
+            while (frequencyFile >> key >> number >> frequency)
+                ngrams.emplace(key, frequency / 100.0);
+            frequencyFile.close();
+        }
+    }
 
     // Training loop
     clock_t time;
@@ -324,7 +343,7 @@ int main()
         cout << "Generation " << gen << "\n";
 
         long double fitnessSum = 0;
-        calcFitness(population, &fitnessSum, ciphertext, ngrams);
+        calcFitness(population, &fitnessSum, ciphertext, ngrams, num_unigrams, num_bigrams, num_trigrams);
         selection(population, &fitnessSum);
         crossover(population);
         mutation(population);

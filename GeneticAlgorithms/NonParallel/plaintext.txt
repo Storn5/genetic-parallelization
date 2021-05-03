@@ -1,1 +1,1 @@
-cryptography is about constructing and analyzing protocols
+Cryptography prior to the modern age was effectively synonymous with encryption
