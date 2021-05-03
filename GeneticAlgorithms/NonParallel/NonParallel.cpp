@@ -4,16 +4,17 @@
 #include <cstring>
 #include <string>
 #include <random>
+#include <time.h>
 #include <map>
 
 using namespace std;
 
-#define MAX_GENS 100
+#define MAX_GENS 10
 #define POP_SIZE 100
 #define ALPH_SIZE 26 + 1
 #define ASCII_a 97
 #define MAX_TEXT_LEN 100
-#define MUTATION_CHANCE 50 // Out of 100 individuals, MUTATION_CHANCE will mutate
+#define MUTATION_CHANCE 60 // Out of 100 individuals, MUTATION_CHANCE will mutate
 #define ALPHA 0.65 // Weight of unigrams
 #define BETA 0.35 // Weight of bigrams
 #define GAMMA 0.0 // Weight of trigrams
@@ -82,23 +83,44 @@ long countSubstring(const string& substring, const string& text)
 /// <returns>Map of char combinations and their frequencies</returns>
 const map<string, long double> countNgrams(const string& text)
 {
+    long double num_unigrams = 0.0, num_bigrams = 0.0, num_trigrams = 0.0;
     map<string, long double> ngrams;
     for (int i = 0; i < ALPH_SIZE; i++)
     {
         string key = string() + ALPHABET[i];
-        long double count = countSubstring(key, text) / (double) text.length();
+        long double count = countSubstring(key, text);
+        num_unigrams += count;
         ngrams.emplace(key, count);
         for (int j = 0; j < ALPH_SIZE; j++)
         {
             string key = string() + ALPHABET[i] + ALPHABET[j];
-            count = countSubstring(key, text) / (double)text.length();
+            count = countSubstring(key, text);
+            num_bigrams += count;
             ngrams.emplace(key, count);
             /*
             for (int k = 0; k < ALPH_SIZE; k++)
             {
                 string key = string() + ALPHABET[i] + ALPHABET[j] + ALPHABET[k];
-                count = countSubstring(key, text) / (double) text.length();
+                count = countSubstring(key, text) / (long double) (text.length() - 2);
+                num_trigrams += count;
                 ngrams.emplace(key, count);
+            }
+            */
+        }
+    }
+    for (int i = 0; i < ALPH_SIZE; i++)
+    {
+        string key = string() + ALPHABET[i];
+        ngrams.at(key) = ngrams.at(key) / num_unigrams;
+        for (int j = 0; j < ALPH_SIZE; j++)
+        {
+            string key = string() + ALPHABET[i] + ALPHABET[j];
+            ngrams.at(key) = ngrams.at(key) / num_bigrams;
+            /*
+            for (int k = 0; k < ALPH_SIZE; k++)
+            {
+                string key = string() + ALPHABET[i] + ALPHABET[j] + ALPHABET[k];
+                ngrams.at(key) = ngrams.at(key) / num_trigrams;
             }
             */
         }
@@ -133,7 +155,7 @@ void calcFitness(Individual population[], long double* fitnessSum, const string&
         for (int i = 0; i < ALPH_SIZE; i++)
         {
             string key = string() + ALPHABET[i];
-            fitness += ALPHA * (abs(cipherNgrams.at(key) - ngrams.at(key))); // TODO: fix the fitness function (why sometimes 0???)
+            fitness += ALPHA * (abs(cipherNgrams.at(key) - ngrams.at(key)));
             for (int j = 0; j < ALPH_SIZE; j++)
             {
                 key = string() + ALPHABET[i] + ALPHABET[j];
@@ -147,7 +169,7 @@ void calcFitness(Individual population[], long double* fitnessSum, const string&
                 */
             }
         }
-        population[idx].fitness = (long double)1.0 / fitness;
+        population[idx].fitness = (long double)pow(1 - (fitness / 4), 8);
         *fitnessSum += population[idx].fitness;
     }
 }
@@ -157,15 +179,17 @@ void calcFitness(Individual population[], long double* fitnessSum, const string&
 /// </summary>
 /// <param name="population">Array of Individuals</param>
 /// <param name="fitnessSum">Sum of fitness values</param>
-void selection(Individual population[], long double* fitnessSum)
+void selection(Individual population[POP_SIZE], long double* fitnessSum)
 {
     Individual newPopulation[POP_SIZE];
     for (int i = 0; i < POP_SIZE; i++)
     {
-        unsigned long long randomVal = rand() % (unsigned long long)(*fitnessSum * 1000); // TODO: fix the weighted sampling algorithm
+        unsigned long long randomVal = rand() % (unsigned long long)(*fitnessSum * 1000);
         int index = 0;
         while (randomVal > 0)
         {
+            if (index >= POP_SIZE)
+                cout << "Error?" << endl; break;
             randomVal -= (unsigned long long)(population[index].fitness * 1000);
             index ++;
         }
@@ -292,6 +316,8 @@ int main()
     const map<string, long double> ngrams = countNgrams(sampletext);
 
     // Training loop
+    clock_t time;
+    time = clock();
     while (gen < MAX_GENS)
     {
         gen += 1;
@@ -305,6 +331,8 @@ int main()
 
         printStats(population, &fitnessSum, ciphertext);
     }
+    time = clock() - time;
+    cout << "Time for " << MAX_GENS << " generations and " << POP_SIZE << " population: " << (float)time / CLOCKS_PER_SEC << " sec.\n";
 
     return 0;
 }
