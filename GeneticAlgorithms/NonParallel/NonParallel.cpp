@@ -9,11 +9,10 @@
 
 using namespace std;
 
-#define MAX_GENS 200
-#define POP_SIZE 250
-#define ALPH_SIZE 10
-#define ASCII_a 97
-#define MAX_TEXT_LEN 100
+#define ASCII_a 97 // DON'T CHANGE (ASCII character a = 97)
+
+#define MAX_GENS 200 // Number of generations
+#define POP_SIZE 250 // Number of individuals in population
 #define CROSSOVER_CHANCE 50 // Out of 100 parents, CROSSOVER_CHANCE will crossover (the rest will just be copied)
 #define MUTATION_CHANCE 50 // Out of 100 children, MUTATION_CHANCE will mutate (the rest will just be copied)
 #define ALPHA 0.5 // Weight of unigrams
@@ -23,7 +22,8 @@ using namespace std;
 #define CUSTOM_FREQ false // Whether frequencies should be calculated from sample text file, or from predefined numbers (false is MUCH faster)
 #define FULL_BIGRAMS false // Whether to use the larger full_bigrams.txt file or the smaller bigrams.txt (false is faster)
 
-const char ALPHABET[ALPH_SIZE+1] = "abcdefghij";
+#define ALPH_SIZE 10 // Length of the key/alphabet to guess
+const char ALPHABET[ALPH_SIZE+1] = "abcdefghij"; // alphabet/key to guess (original state, not correct)
 
 /// <summary>
 /// An Individual contains a chromosome (25 genes) and fitness score.
