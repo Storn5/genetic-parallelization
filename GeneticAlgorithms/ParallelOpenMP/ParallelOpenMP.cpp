@@ -13,7 +13,7 @@ using namespace std;
 
 #define ASCII_a 97 // DON'T CHANGE (ASCII character a = 97)
 
-#define MAX_GENS 200 // Number of generations
+#define MAX_GENS 50 // Number of generations
 #define POP_SIZE 250 // Number of individuals in population
 #define CROSSOVER_CHANCE 50 // Out of 100 parents, CROSSOVER_CHANCE will crossover (the rest will just be copied)
 #define MUTATION_CHANCE 50 // Out of 100 children, MUTATION_CHANCE will mutate (the rest will just be copied)
@@ -131,6 +131,7 @@ const map<string, long double> countNgrams(const string& text, map<string, long 
 /// <param name="pop">Array of Individuals</param>
 void initPopulation(Individual population[])
 {
+#pragma omp parallel for
     for (int i = 0; i < POP_SIZE; i++)
         random_shuffle(begin(population[i].genes), end(population[i].genes) - 1);
 }
@@ -144,6 +145,8 @@ void initPopulation(Individual population[])
 /// <param name="ngrams">Map of char combinations and their frequencies</param>
 void calcFitness(Individual population[], long double* fitnessSum, const string& ciphertext, map<string, long double> ngrams, long double num_unigrams, long double num_bigrams, long double num_trigrams)
 {
+    long double sum = 0;
+#pragma omp parallel for reduction (+: sum)
     for (int idx = 0; idx < POP_SIZE; idx++)
     {
         map<string, long double> cipherNgrams = countNgrams(decipher(ciphertext, population[idx].genes), ngrams, num_unigrams, num_bigrams, num_trigrams);
@@ -159,8 +162,9 @@ void calcFitness(Individual population[], long double* fitnessSum, const string&
         }
 
         population[idx].fitness = (long double)pow((long double)pow(1 - (fitness / 4), 8), 3);
-        *fitnessSum += population[idx].fitness;
+        sum += population[idx].fitness;
     }
+    *fitnessSum = sum;
 }
 
 /// <summary>
@@ -193,7 +197,7 @@ void selection(Individual population[POP_SIZE], long double* fitnessSum)
         int i = 0, j = 0;
         while (i < POP_SIZE)
         {
-            for (int j = 0; j < POP_SIZE; j++)
+            for (j = 0; j < POP_SIZE; j++)
             {
                 if (population[j].fitness > avgFitness)
                 {
@@ -323,6 +327,12 @@ int main(int argc, char* argv[])
     num_unigrams = numNgrams(ciphertext, 1);
     num_bigrams = numNgrams(ciphertext, 2);
     num_trigrams = numNgrams(ciphertext, 3);
+
+    // Set number of threads
+    int n_threads = 4;
+    std::cout << "Enter the number of threads: ";
+    std::cin >> n_threads;
+    omp_set_num_threads(n_threads);
 
     if (CUSTOM_FREQ) // Calculating frequencies from sample text file
     {

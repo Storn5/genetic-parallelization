@@ -11,7 +11,7 @@ using namespace std;
 
 #define ASCII_a 97 // DON'T CHANGE (ASCII character a = 97)
 
-#define MAX_GENS 200 // Number of generations
+#define MAX_GENS 50 // Number of generations
 #define POP_SIZE 250 // Number of individuals in population
 #define CROSSOVER_CHANCE 50 // Out of 100 parents, CROSSOVER_CHANCE will crossover (the rest will just be copied)
 #define MUTATION_CHANCE 50 // Out of 100 children, MUTATION_CHANCE will mutate (the rest will just be copied)
@@ -23,7 +23,7 @@ using namespace std;
 #define FULL_BIGRAMS false // Whether to use the larger full_bigrams.txt file or the smaller bigrams.txt (false is faster)
 
 #define ALPH_SIZE 10 // Length of the key/alphabet to guess
-const char ALPHABET[ALPH_SIZE+1] = "abcdefghij"; // alphabet/key to guess (original state, not correct)
+const char ALPHABET[ALPH_SIZE + 1] = "abcdefghij"; // alphabet/key to guess (original state, not correct)
 
 /// <summary>
 /// An Individual contains a chromosome (25 genes) and fitness score.
@@ -191,7 +191,7 @@ void selection(Individual population[POP_SIZE], long double* fitnessSum)
         int i = 0, j = 0;
         while (i < POP_SIZE)
         {
-            for (int j = 0; j < POP_SIZE; j++)
+            for (j = 0; j < POP_SIZE; j++)
             {
                 if (population[j].fitness > avgFitness)
                 {
@@ -312,7 +312,7 @@ int main()
     long double num_unigrams, num_bigrams, num_trigrams;
 
     // Reading input from files
-    ifstream ciphertextFile("ciphertext.txt"); // Text to be deciphered
+    ifstream ciphertextFile("../../ciphertext.txt"); // Text to be deciphered
     stringstream ciphertextBuffer;
     ciphertextBuffer << ciphertextFile.rdbuf();
     string ciphertext = ciphertextBuffer.str();
@@ -324,7 +324,7 @@ int main()
 
     if (CUSTOM_FREQ) // Calculating frequencies from sample text file
     {
-        ifstream sampletextFile("sampletext.txt"); // Text to calculate letter frequencies
+        ifstream sampletextFile("../../sampletext.txt"); // Text to calculate letter frequencies
         stringstream sampletextBuffer;
         sampletextBuffer << sampletextFile.rdbuf();
         string sampletext = sampletextBuffer.str();
@@ -352,15 +352,15 @@ int main()
     }
     else // Reading frequencies from predefined numbers
     {
-        string filenames[] = { "unigrams.txt", "bigrams.txt", "trigrams.txt" };
+        string filenames[] = { "../../unigrams.txt", "../../bigrams.txt", "../../trigrams.txt" };
         if (FULL_BIGRAMS)
-            filenames[1] = "full_bigrams.txt";
+            filenames[1] = "../../full_bigrams.txt";
         for (string filename : filenames)
         {
             ifstream frequencyFile(filename);
             string key;
             long double number, frequency;
-            if (FULL_BIGRAMS && filename == "full_bigrams.txt")
+            if (FULL_BIGRAMS && filename == "../../full_bigrams.txt")
                 while (frequencyFile >> key >> frequency)
                     ngrams.emplace(key, frequency / 100.0);
             else
