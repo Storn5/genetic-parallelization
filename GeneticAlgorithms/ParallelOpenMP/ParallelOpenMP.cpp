@@ -290,9 +290,9 @@ void mutation(Individual population[])
 /// <param name="population">Array of Individuals</param>
 /// <param name="fitnessSum">Sum of fitness values of population</param>
 /// <param name="ciphertext">Text to be deciphered</param>
-void printStats(Individual population[], long double* fitnessSum, const string& ciphertext)
+void printStats(Individual population[], long double* fitnessSum, const string& ciphertext, const string& plaintext)
 {
-    cout << "Avg fitness:\t\t" << *fitnessSum / POP_SIZE << "\n";
+    //cout << "Avg fitness:\t\t" << *fitnessSum / POP_SIZE << "\n";
     long double maxFitness = 0;
     string bestGenes = ALPHABET;
     for (int i = 0; i < POP_SIZE; i++)
@@ -303,9 +303,18 @@ void printStats(Individual population[], long double* fitnessSum, const string& 
             bestGenes = population[i].genes;
         }
     }
-    cout << "Max fitness:\t\t" << maxFitness << "\n";
-    cout << "Best guess:\t\t" << decipher(ciphertext, bestGenes) << "\n";
+    const string deciphered = decipher(ciphertext, bestGenes);
+    //cout << "Max fitness:\t\t" << maxFitness << "\n";
+    //cout << "Best guess:\t\t" << deciphered << "\n";
     cout << "Best genes:\t\t" << bestGenes << "\n";
+
+    long double bestAccuracy = 0.0;
+    string::size_type i;
+    for (i = 0; i < deciphered.length(); i++)
+        if (deciphered[i] == plaintext[i])
+            bestAccuracy++;
+    bestAccuracy /= deciphered.length();
+    cout << "Best accuracy:\t\t" << bestAccuracy << "\n";
 }
 
 int main(int argc, char* argv[])
@@ -318,6 +327,12 @@ int main(int argc, char* argv[])
     long double num_unigrams, num_bigrams, num_trigrams;
 
     // Reading input from files
+    ifstream plaintextFile("../../plaintext.txt"); // Target text
+    stringstream plaintextBuffer;
+    plaintextBuffer << plaintextFile.rdbuf();
+    string plaintext = plaintextBuffer.str();
+    plaintext.erase(std::remove_if(plaintext.begin(), plaintext.end(), [](const unsigned& c) { return !isspace(c) && !isalpha(c); }), plaintext.end());
+    plaintextFile.close();
     ifstream ciphertextFile("../../ciphertext.txt"); // Text to be deciphered
     stringstream ciphertextBuffer;
     ciphertextBuffer << ciphertextFile.rdbuf();
@@ -396,7 +411,7 @@ int main(int argc, char* argv[])
         crossover(population);
         mutation(population);
 
-        printStats(population, &fitnessSum, ciphertext);
+        printStats(population, &fitnessSum, ciphertext, plaintext);
     }
     time = clock() - time;
     cout << "Time for " << MAX_GENS << " generations and " << POP_SIZE << " population: " << (float)time / CLOCKS_PER_SEC << " sec.\n";

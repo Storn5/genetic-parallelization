@@ -298,8 +298,8 @@ void printStats(Individual population[], long double* fitnessSum, const string& 
         }
     }
     const string deciphered = decipher(ciphertext, bestGenes);
-    cout << "Max fitness:\t\t" << maxFitness << "\n";
-    cout << "Best guess:\t\t" << deciphered << "\n";
+    //cout << "Max fitness:\t\t" << maxFitness << "\n";
+    //cout << "Best guess:\t\t" << deciphered << "\n";
     cout << "Best genes:\t\t" << bestGenes << "\n";
 
     long double bestAccuracy = 0.0;
